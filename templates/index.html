@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOCKS5 节点控制台</title>
+<style>
+:root {
+  --bg: #0b0f19;
+  --surface: #131b2e;
+  --card: #182238;
+  --card-hover: #1f2b47;
+  --border: #283754;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --ok: #10b981;
+  --bad: #ef4444;
+  --warn: #f59e0b;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 24px;
+  line-height: 1.5;
+}
+.container { max-width: 1260px; margin: 0 auto; }
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+h1 { font-size: 1.5rem; margin: 0; display: flex; align-items: center; gap: 10px; }
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+input, select, button {
+  background: #0d1424;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--accent); }
+button {
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: filter 0.15s;
+}
+button:hover { filter: brightness(1.15); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.secondary { background: #26354f; color: var(--text); }
+button.danger { background: var(--bad); }
+button.success { background: var(--ok); }
+button.small { padding: 4px 10px; font-size: 0.8rem; border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; }
+th, td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+  text-align: left;
+  font-size: 0.88rem;
+}
+th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.15); }
+tr:hover { background: rgba(255,255,255,0.02); }
+.status-running { color: var(--ok); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.status-stopped { color: var(--bad); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-ok { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.dot-bad { background: var(--bad); }
+.muted { color: var(--muted); font-size: 0.85rem; }
+.cred-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #0d1424;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #38bdf8;
+  border: 1px solid var(--border);
+}
+.speed-badge { font-weight: 600; color: #34d399; }
+.ping-val { font-family: monospace; }
+.country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+#login-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7, 11, 20, 0.88);
+  backdrop-filter: blur(4px);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1000;
+}
+#login-box {
+  background: var(--surface);
+  padding: 32px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: none; justify-content: center; align-items: center;
+  z-index: 900;
+}
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  width: 90%;
+  max-width: 460px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+}
+.modal-box h3 { margin-top: 0; }
+.copy-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+.copy-btn:hover { color: var(--text); border-color: var(--accent); }
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.cache-banner {
+  background: rgba(13, 20, 36, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.error-tip {
+  color: var(--bad);
+  font-size: 0.85rem;
+  margin-top: 8px;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Login Modal -->
+<div id="login-overlay">
+  <div id="login-box">
+    <h2 style="margin-top:0">API Token 验证</h2>
+    <p class="muted" style="margin-bottom:14px">请输入控制台 API Token（开发测试模式默认: dev）</p>
+    <input type="password" id="tokenInput" placeholder="输入 API Token (默认 dev)" style="width:100%; margin-bottom:10px">
+    <div id="loginErrorTip" class="error-tip"></div>
+    <button onclick="login()" style="width:100%; margin-top:6px">进入控制台</button>
+  </div>
+</div>
+
+<div class="container" id="main" style="display:none">
+  <header>
+    <div>
+      <h1>SOCKS5 节点管理器</h1>
+      <span class="muted" id="statusBar">初始化连接…</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px">
+      <button class="secondary small" onclick="logout()">退出登录</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtnNodes" onclick="showTab('nodes')">
+      <span>当前 SOCKS5 节点</span>
+      <span class="badge" id="nodesCountBadge">0</span>
+    </button>
+    <button class="tab-btn" id="tabBtnVpngate" onclick="showTab('vpngate')">
+      <span>VPN Gate 节点广场</span>
+      <span class="badge" id="vpngateCountBadge">0</span>
+    </button>
+  </div>
+
+  <!-- Page 1: Current SOCKS5 Nodes & Config -->
+  <div id="pageNodes">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
+        <div id="credBox" class="muted">加载认证信息中…</div>
+        <div class="form-row">
+          <input type="file" id="ovpnFile" accept=".ovpn" style="max-width:180px">
+          <button class="secondary" onclick="uploadOvpn()">上传自定义 .ovpn</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0; overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>节点名称</th>
+            <th>SOCKS5 端口</th>
+            <th>国家</th>
+            <th>出口 IP</th>
+            <th>状态</th>
+            <th>失败计数</th>
+            <th>代理链接</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="nodeList">
+          <tr><td colspan="8" class="empty-state">暂无已配置节点，请点击上方“VPN Gate 节点广场”添加。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Page 2: VPN Gate Public Explorer -->
+  <div id="pageVpngate" style="display:none">
+    <div class="card">
+      <div class="cache-banner">
+        <div>
+          📁 本地缓存文件: <code id="cacheFilePath" class="cred-val">加载中…</code>
+          <span class="muted" style="margin-left:12px" id="cacheTimeSpan">更新时间: 加载中…</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px">
+          <button class="small" onclick="loadVpngateNodes(true)">🔄 刷新节点库</button>
+        </div>
+      </div>
+
+      <!-- Clean filter bar: ONLY Country (sorted by node count) and TotalUsers sort -->
+      <div class="form-row" style="margin-bottom:8px">
+        <label class="muted" style="font-size:0.9rem">选择国家 (按可用节点数排序)：</label>
+        <select id="countrySelect" onchange="applyVpngateFilter()" style="min-width:280px">
+          <option value="">全部国家/地区 (按可用节点数排序)</option>
+        </select>
+
+        <label class="muted" style="font-size:0.9rem; margin-left:8px">TotalUsers 排序：</label>
+        <select id="userSortSelect" onchange="applyVpngateFilter()" style="min-width:220px">
+          <option value="asc" selected>TotalUsers 从少到多 (升序 / 推荐)</option>
+          <option value="desc">TotalUsers 从多到少 (降序)</option>
+        </select>
+
+        <span class="muted" id="vpngateFilterInfo" style="margin-left:auto">正在加载节点…</span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0; overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>国家 / 地区</th>
+            <th>主机名 / IP</th>
+            <th>TotalUsers (累计用户数)</th>
+            <th>测速带宽</th>
+            <th>Ping 延迟</th>
+            <th>在线会话</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="vpngateList">
+          <tr><td colspan="7" class="empty-state">正在载入 VPN Gate 节点列表…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add SOCKS5 Node Dialog -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal-box">
+    <h3>添加为 SOCKS5 节点</h3>
+    <p class="muted" style="margin-bottom:16px" id="modalNodeSummary">已选目标节点</p>
+    <div style="margin-bottom:12px">
+      <label class="muted" style="display:block; margin-bottom:4px">节点名称 (可自定义)</label>
+      <input type="text" id="modalNodeName" placeholder="节点名称" style="width:100%">
+    </div>
+    <div style="margin-bottom:20px">
+      <label class="muted" style="display:block; margin-bottom:4px">SOCKS5 监听端口 (留空自动分配)</label>
+      <input type="number" id="modalNodePort" placeholder="留空自动分配 (如 10801)" style="width:100%">
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px">
+      <button class="secondary" onclick="closeCreateModal()">取消</button>
+      <button id="modalSubmitBtn" onclick="confirmCreateNode()">🚀 确认添加并启动</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auto-detect API base URL (supports both HTTP server and direct file:/// opening)
+const API_BASE = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? ''
+  : 'http://127.0.0.1:8899';
+
+let token = '';
+let currentTab = 'nodes';
+let allVpngateNodes = [];
+let availableCountries = [];
+let selectedVpnhost = null;
+let socksCreds = { user: '', pass: '' };
+let fetchNodesInterval = null;
+
+function getHeaders() {
+  return { 'Content-Type': 'application/json', 'X-API-Token': token };
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('loginErrorTip');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function clearLoginError() {
+  const el = document.getElementById('loginErrorTip');
+  el.style.display = 'none';
+}
+
+function login() {
+  clearLoginError();
+  token = document.getElementById('tokenInput').value.trim();
+  if (!token) {
+    showLoginError('请输入 API Token');
+    return;
+  }
+  sessionStorage.setItem('apiToken', token);
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  initApp();
+}
+
+function logout() {
+  sessionStorage.removeItem('apiToken');
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('main').style.display = 'none';
+  if (fetchNodesInterval) {
+    clearInterval(fetchNodesInterval);
+    fetchNodesInterval = null;
+  }
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabBtnNodes').classList.toggle('active', tab === 'nodes');
+  document.getElementById('tabBtnVpngate').classList.toggle('active', tab === 'vpngate');
+  document.getElementById('pageNodes').style.display = (tab === 'nodes') ? 'block' : 'none';
+  document.getElementById('pageVpngate').style.display = (tab === 'vpngate') ? 'block' : 'none';
+}
+
+async function initApp() {
+  await fetchCreds();
+  await fetchNodes();
+  // Preload VPN Gate nodes into JS memory immediately
+  loadVpngateNodes(false);
+  fetchNodesInterval = setInterval(fetchNodes, 5000);
+}
+
+async function fetchCreds() {
+  try {
+    const r = await fetch(`${API_BASE}/api/credentials`, { headers: getHeaders() });
+    if (!r.ok) return;
+    const c = await r.json();
+    socksCreds.user = c.socks_user || '';
+    socksCreds.pass = c.socks_pass || '';
+    if (c.socks_user) {
+      document.getElementById('credBox').innerHTML =
+        'SOCKS5 认证凭据：用户 <span class="cred-val">' + esc(c.socks_user) + '</span> ' +
+        '密码 <span class="cred-val">' + esc(c.socks_pass) + '</span> ' +
+        '<button class="copy-btn js-copy-text" data-text="' + esc(c.socks_user) + ':' + esc(c.socks_pass) + '">复制凭证</button>';
+    } else {
+      document.getElementById('credBox').innerHTML = '<span style="color:var(--warn)">提示：当前系统未设置 SOCKS5 认证</span>';
+    }
+  } catch (e) {
+    console.warn('获取凭据异常:', e);
+  }
+}
+
+async function fetchNodes() {
+  try {
+    const r = await fetch(`${API_BASE}/api/nodes`, { headers: getHeaders() });
+    if (r.status === 401) {
+      showLoginError('Token 鉴权失败，请重新输入');
+      logout();
+      return;
+    }
+    const nodes = await r.json();
+    const s = await (await fetch(`${API_BASE}/api/status`, { headers: getHeaders() })).json();
+
+    document.getElementById('nodesCountBadge').textContent = `${s.running}/${s.total}`;
+    document.getElementById('statusBar').textContent =
+      `共 ${s.total} 个节点，运行中 ${s.running} 个` +
+      (s.socks_auth_enabled ? ' · SOCKS5 已认证' : ' · SOCKS5 无认证');
+
+    if (s.vpngate_cache_file) {
+      document.getElementById('cacheFilePath').textContent = s.vpngate_cache_file;
+      document.getElementById('cacheTimeSpan').textContent = `更新时间: ${s.vpngate_cached_at || '刚刚'}`;
+    }
+
+    if (nodes.length === 0) {
+      document.getElementById('nodeList').innerHTML =
+        '<tr><td colspan="8" class="empty-state">暂无已配置节点，请前往“VPN Gate 节点广场”直接挑选添加。</td></tr>';
+      return;
+    }
+
+    document.getElementById('nodeList').innerHTML = nodes.map(item => {
+      const authPart = socksCreds.user ? `${socksCreds.user}:${socksCreds.pass}@` : '';
+      const proxyUrl = `socks5://${authPart}127.0.0.1:${item.port}`;
+      return `
+        <tr>
+          <td><strong>${esc(item.name)}</strong></td>
+          <td><span class="cred-val">${item.port}</span></td>
+          <td><span class="country-pill">${esc(item.country || '-')}</span></td>
+          <td><code>${esc(item.ext_ip || '-')}</code></td>
+          <td>
+            <span class="${item.running ? 'status-running' : 'status-stopped'}">
+              <span class="status-dot ${item.running ? 'dot-ok' : 'dot-bad'}"></span>
+              ${item.running ? '运行中' : '已停止'}
+            </span>
+          </td>
+          <td>${item.failures || 0}</td>
+          <td>
+            <button class="copy-btn js-copy-text" data-text="${proxyUrl}" title="复制代理链接">复制链接</button>
+          </td>
+          <td>
+            <button class="danger small js-delete-node" data-name="${esc(item.name)}">删除</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    document.getElementById('statusBar').textContent = '无法连接到后端 API，请确认后台服务已启动 (127.0.0.1:8899)';
+  }
+}
+
+// --------------------------------------------------------------------------
+// 【纯 JS 业务逻辑】按 API 返回结果动态提取国家并按“可用节点数”降序排序
+// 选定国家后，按 TotalUsers 排序，无任何其他冗余筛选条件
+// --------------------------------------------------------------------------
+
+async function loadVpngateNodes(forceRefresh = false) {
+  const infoEl = document.getElementById('vpngateFilterInfo');
+  infoEl.textContent = forceRefresh ? '正在从服务器获取最新节点并缓存…' : '正在读取节点缓存…';
+  const tbody = document.getElementById('vpngateList');
+  tbody.innerHTML = '<tr><td colspan="7" class="empty-state">正在载入数据…</td></tr>';
+
+  try {
+    const url = forceRefresh ? `${API_BASE}/api/vpngate/nodes?refresh=1` : `${API_BASE}/api/vpngate/nodes`;
+    const r = await fetch(url, { headers: getHeaders() });
+    if (!r.ok) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">获取节点列表失败，请确认后台服务已启动。</td></tr>';
+      return;
+    }
+    allVpngateNodes = await r.json();
+    document.getElementById('vpngateCountBadge').textContent = allVpngateNodes.length;
+
+    // 【纯 JS 实现】：按 API 返回结果动态提取国家，并按可用节点数从多到少排序
+    extractCountriesSortedByCount(allVpngateNodes);
+
+    // 【纯 JS 实现】：按当前选定国家与 TotalUsers 排序渲染节点
+    applyVpngateFilter();
+  } catch (e) {
+    console.error(e);
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">未能连接后端服务 (http://127.0.0.1:8899)，请确认服务是否已运行。</td></tr>';
+  }
+}
+
+/**
+ * 【纯 JS 实现】国家按可用节点数从多到少排序
+ */
+function extractCountriesSortedByCount(nodes) {
+  const map = {};
+  nodes.forEach(n => {
+    const code = (n.country || '').toUpperCase();
+    if (!code) return;
+    const countryLong = n.country_long || code;
+
+    if (!map[code]) {
+      map[code] = {
+        code: code,
+        name: countryLong,
+        count: 1
+      };
+    } else {
+      map[code].count++;
+    }
+  });
+
+  // 严格按“可用节点数”从多到少排序
+  availableCountries = Object.values(map);
+  availableCountries.sort((a, b) => b.count - a.count);
+
+  // 渲染国家下拉框
+  const select = document.getElementById('countrySelect');
+  const curVal = select.value;
+  let options = `<option value="">全部国家/地区 (共 ${allVpngateNodes.length} 个节点)</option>`;
+
+  availableCountries.forEach(c => {
+    options += `<option value="${c.code}">${esc(c.code)} - ${esc(c.name)} (${c.count} 个可用节点)</option>`;
+  });
+  select.innerHTML = options;
+  if (curVal) select.value = curVal;
+}
+
+/**
+ * 【纯 JS 实现】选定国家后，按 TotalUsers 排序渲染表格
+ */
+function applyVpngateFilter() {
+  const selectedCountry = document.getElementById('countrySelect').value.toUpperCase();
+  const sortDirection = document.getElementById('userSortSelect').value; // 'asc' or 'desc'
+
+  // 1. 选定国家过滤
+  let filtered = allVpngateNodes.filter(n => {
+    if (selectedCountry && (n.country || '').toUpperCase() !== selectedCountry) {
+      return false;
+    }
+    return true;
+  });
+
+  // 2. 按 TotalUsers 排序 (少的优先 / 多的优先)
+  filtered.sort((a, b) => {
+    const uA = Number(a.total_users) || 0;
+    const uB = Number(b.total_users) || 0;
+    if (sortDirection === 'asc') {
+      return uA - uB; // TotalUsers 少的优先 (升序)
+    } else {
+      return uB - uA; // TotalUsers 多的优先 (降序)
+    }
+  });
+
+  document.getElementById('vpngateFilterInfo').textContent =
+    `当前显示 ${filtered.length} 个节点 (共 ${allVpngateNodes.length} 个)`;
+
+  renderTable(filtered);
+}
+
+function renderTable(nodes) {
+  const tbody = document.getElementById('vpngateList');
+  if (nodes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">当前国家暂无可用节点。</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = nodes.map(item => {
+    const mbps = ((Number(item.speed) || 0) / 1000000).toFixed(1);
+    return `
+      <tr>
+        <td>
+          <span class="country-pill">${esc(item.country)}</span>
+          <span class="muted" style="margin-left:4px">${esc(item.country_long || '')}</span>
+        </td>
+        <td>
+          <div><strong>${esc(item.host)}</strong></div>
+          <div class="muted">${esc(item.ip)}</div>
+        </td>
+        <td><strong style="color:#38bdf8; font-size:1rem">${(Number(item.total_users) || 0).toLocaleString()}</strong></td>
+        <td><span class="speed-badge">${mbps} Mbps</span></td>
+        <td><span class="ping-val">${item.ping || '-'} ms</span></td>
+        <td>${item.sessions || 0}</td>
+        <td>
+          <button class="small js-open-create-modal" data-host="${esc(item.host)}" data-country="${esc(item.country)}" data-ip="${esc(item.ip)}" data-users="${item.total_users || 0}">
+            ➕ 添加为 SOCKS5 节点
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openCreateModal(host, country, ip, totalUsers) {
+  selectedVpnhost = host;
+  document.getElementById('modalNodeSummary').innerHTML =
+    `目标节点：<strong>${esc(country)}</strong> (${esc(ip)}) · <code>${esc(host)}</code> · TotalUsers: <strong>${Number(totalUsers).toLocaleString()}</strong>`;
+  const prefix = host.split('.')[0] || 'node';
+  document.getElementById('modalNodeName').value = `${country}_${prefix}`;
+  document.getElementById('modalNodePort').value = '';
+  document.getElementById('createModal').style.display = 'flex';
+}
+
+function closeCreateModal() {
+  document.getElementById('createModal').style.display = 'none';
+  selectedVpnhost = null;
+}
+
+async function confirmCreateNode() {
+  if (!selectedVpnhost) return;
+  const name = document.getElementById('modalNodeName').value.trim();
+  const portStr = document.getElementById('modalNodePort').value.trim();
+  const submitBtn = document.getElementById('modalSubmitBtn');
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = '启动部署中…';
+
+  const payload = { vpngate_host: selectedVpnhost };
+  if (name) payload.name = name;
+  if (portStr) payload.port = parseInt(portStr, 10);
+
+  try {
+    const r = await fetch(`${API_BASE}/api/node/add`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      closeCreateModal();
+      // Directly switch to Page 1 so user immediately sees the newly created SOCKS5 node
+      showTab('nodes');
+      fetchNodes();
+      alert(`已成功添加 SOCKS5 节点 "${j.node.name}" (端口: ${j.node.port})！`);
+    } else {
+      alert(j.error || '添加节点失败');
+    }
+  } catch (e) {
+    alert('网络异常: ' + e);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '🚀 确认添加并启动';
+  }
+}
+
+async function uploadOvpn() {
+  const file = document.getElementById('ovpnFile').files[0];
+  if (!file) return alert('请选择 .ovpn 文件');
+  const text = await file.text();
+  const name = prompt('请输入节点名称:');
+  if (!name) return;
+  const port = prompt('请输入 SOCKS5 端口 (留空自动分配):');
+  const data = { name, ovpn_content: text };
+  if (port && port.trim()) data.port = parseInt(port.trim(), 10);
+
+  const r = await fetch(`${API_BASE}/api/node/add`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  const j = await r.json();
+  if (r.ok) {
+    fetchNodes();
+    alert(`节点 "${j.node.name}" 上传成功！`);
+  } else {
+    alert(j.error || '上传失败');
+  }
+}
+
+async function deleteNode(name) {
+  if (!confirm('确定停止并删除节点 ' + name + ' 吗？')) return;
+  const r = await fetch(`${API_BASE}/api/node/del`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ name })
+  });
+  if (r.ok) {
+    fetchNodes();
+  } else {
+    alert((await r.json()).error || '删除失败');
+  }
+}
+
+function copyText(str) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(str);
+  } else {
+    const input = document.createElement('textarea');
+    input.value = str;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+  }
+  alert('已复制到剪贴板: ' + str);
+}
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+window.onload = function () {
+  const saved = sessionStorage.getItem('apiToken');
+  if (saved) {
+    document.getElementById('tokenInput').value = saved;
+  }
+  // Auto-login if token is already present
+  if (saved) {
+    login();
+  }
+
+  document.body.addEventListener('click', function(e) {
+    const copyBtn = e.target.closest('.js-copy-text');
+    if (copyBtn) {
+      copyText(copyBtn.dataset.text);
+      return;
+    }
+    const deleteBtn = e.target.closest('.js-delete-node');
+    if (deleteBtn) {
+      deleteNode(deleteBtn.dataset.name);
+      return;
+    }
+    const createModalBtn = e.target.closest('.js-open-create-modal');
+    if (createModalBtn) {
+      openCreateModal(createModalBtn.dataset.host, createModalBtn.dataset.country, createModalBtn.dataset.ip, createModalBtn.dataset.users);
+      return;
+    }
+  });
+};
+</script>
+</body>
+</html>
